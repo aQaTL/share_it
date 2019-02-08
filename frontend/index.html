@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Share it</title>
+	<script>
+        "use strict";
+
+        function load_files() {
+            let req = new XMLHttpRequest();
+
+            req.onreadystatechange = function() {
+                if (this.readyState === 4 && this.status === 200) {
+                    // display_files(JSON.parse(this.responseText));
+                    display_files(this.responseText);
+                }
+            };
+
+            req.open("GET", "/index", true);
+            req.send();
+        }
+
+        function display_files(files) {
+            let filesView = document.getElementById("files_view");
+            filesView.innerHTML = files;
+        }
+
+        window.onload = load_files;
+	</script>
+</head>
+<body>
+	<h1>Share it</h1>
+	Your files:
+	<br>
+	<div id="files_view">
+	</div>
+</body>
+</html>
