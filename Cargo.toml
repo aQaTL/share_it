@@ -1,0 +1,11 @@
+[package]
+name = "share_it"
+version = "0.1.0"
+authors = ["aQaTL <mmsoltys@outlook.com>"]
+edition = "2018"
+license = "MIT"
+
+[dependencies]
+clap = "2"
+rocket = "0.4.0"
+rocket_contrib = "0.4.0"
