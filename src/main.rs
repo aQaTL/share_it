@@ -2,14 +2,18 @@
 
 use rocket::{
 	get, handler,
-	request::Request,
+	request::{Request, State},
+	response::content,
 	config::{Config, Environment},
 };
-use rocket_contrib::serve::StaticFiles;
+use rocket_contrib::{
+	serve::StaticFiles,
+};
 use std::{
 	path::PathBuf,
 	fs,
 };
+use serde_derive::Serialize;
 
 fn clap_app() -> clap::App<'static, 'static> {
 	use clap::*;
@@ -30,7 +34,7 @@ fn clap_app() -> clap::App<'static, 'static> {
 			.default_value("s"))
 		.arg(Arg::with_name("address")
 			.help("ip of the network interface on which the application will serve")
-			.short("ip")
+			.long("address")
 			.takes_value(true)
 			.default_value("127.0.0.1"))
 		.arg(Arg::with_name("port")
@@ -47,7 +51,7 @@ fn main() {
 	let port = match port.parse::<u16>() {
 		Ok(port) => port,
 		Err(_) => {
-			exit_gracefully(&format!(
+			graceful_exit(&format!(
 				"Invalid value, could not parse `{}` as a port number (0 - 65535)", port));
 			0
 		}
@@ -59,7 +63,7 @@ fn main() {
 	let resource_str = app.value_of("resource").unwrap();
 	let resource = PathBuf::from(resource_str);
 	if !resource.exists() {
-		exit_gracefully(&format!("{} not found", resource_str));
+		graceful_exit(&format!("{} not found", resource_str));
 	}
 	let mut resource = resource.canonicalize().unwrap();
 	if resource.is_file() {
@@ -69,8 +73,8 @@ fn main() {
 	let resource_dir = match fs::read_dir(resource.clone()) {
 		Ok(dir) => dir.collect::<Vec<_>>(),
 		Err(err) => {
-			exit_gracefully(&format!("error reading {}: {}",
-									 resource.display(), err.to_string()));
+			graceful_exit(&format!("error reading {}: {}",
+								   resource.display(), err.to_string()));
 			unreachable!()
 		}
 	};
@@ -84,11 +88,14 @@ fn main() {
 		.finalize()
 		.unwrap();
 
+	let resource_dir = resource_dir
+		.into_iter()
+		.filter_map(|e| e.ok())
+		.map(|e| e.file_name().into_string().unwrap())
+		.collect::<Vec<_>>();
 
-	for e in resource_dir.iter().filter(|e| e.is_ok()) {
-		if let Ok(e) = e {
-			println!("{}", e.file_name().into_string().unwrap());
-		}
+	for e in &resource_dir {
+		println!("{}", e);
 	}
 
 	let mut static_files: Vec<rocket::Route> = StaticFiles::new(
@@ -100,21 +107,26 @@ fn main() {
 		.mount(&format!("/{}", name), static_files)
 		.mount("/index", vec![get_dir_ls_route])
 		.mount("/", rocket::routes![index])
+//		.mount("/frontend", ) //TODO serving frontend files included in binary (include! macro)
+		.manage(ResourceDir(resource_dir)) //TODO handle dir content changes
 		.launch();
 }
 
+#[derive(Serialize)]
+struct ResourceDir(Vec<String>);
+
 #[get("/")]
-fn index() -> rocket::response::content::Html<&'static str> {
-	rocket::response::content::Html(include_str!("../frontend/index.html"))
+fn index() -> content::Html<&'static str> {
+	content::Html(include_str!("../frontend/index.html"))
 }
 
 fn get_dir_ls<'r>(req: &'r Request, _: rocket::Data) -> handler::Outcome<'r> {
-	//serialize to json
-	rocket::Outcome::from(req, "dirs...".to_string())
+	let resource_dir = req.guard::<State<ResourceDir>>().unwrap().inner();
+	rocket::Outcome::from(req, rocket::response::content::Json(serde_json::to_string(resource_dir)))
 }
 
 
-fn exit_gracefully(err: &str) {
+fn graceful_exit(err: &str) {
 	eprintln!("{}", err);
 	std::process::exit(1);
 }

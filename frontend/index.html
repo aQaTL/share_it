@@ -8,24 +8,21 @@
 
         function load_files() {
             let req = new XMLHttpRequest();
-
-            req.onreadystatechange = function() {
-                if (this.readyState === 4 && this.status === 200) {
-                    // display_files(JSON.parse(this.responseText));
-                    display_files(this.responseText);
-                }
-            };
-
-            req.open("GET", "/index", true);
+            req.open("GET", "/index", false);
             req.send();
+            return JSON.parse(req.responseText);
         }
 
         function display_files(files) {
             let filesView = document.getElementById("files_view");
-            filesView.innerHTML = files;
+            let text = files.reduce((accumulator, filename) =>
+                    accumulator += `</li><a href="s/${encodeURI(filename)}">${filename}</a><br>`,
+                "");
+            filesView.innerHTML = text;
         }
 
-        window.onload = load_files;
+        let files = load_files();
+        window.onload = () => display_files(files);
 	</script>
 </head>
 <body>
