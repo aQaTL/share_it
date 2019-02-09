@@ -105,7 +105,6 @@ fn main() {
 		.mount("/index", vec![rocket::Route::new(http::Method::Get, "/", get_dir_ls)])
 		.mount("/", rocket::routes![index, serve_frontend, serve_resource, serve_resource_backfire])
 		.manage(ResourceDir(resource_dir)) //TODO handle dir content changes
-		.manage(frontend_files())
 		.launch();
 }
 
@@ -113,13 +112,13 @@ fn main() {
 struct ResourceDir(Vec<String>);
 
 #[get("/")]
-fn index(frontend_files: State<FrontendFiles>) -> content::Html<&'static str> {
-	content::Html(frontend_files.get("index.html").unwrap())
+fn index() -> content::Html<&'static str> {
+	content::Html(FRONTEND_FILES.get("index.html").unwrap())
 }
 
 #[get("/<resource..>", rank=2)]
-fn serve_frontend(frontend_files: State<FrontendFiles>, resource: PathBuf) -> Option<content::Content<&'static str>> {
-	let file = frontend_files.get(resource.to_str().unwrap())?;
+fn serve_frontend(resource: PathBuf) -> Option<content::Content<&'static str>> {
+	let file = FRONTEND_FILES.get(resource.to_str().unwrap())?;
 	if let Some(ext) = resource.extension() {
 		if let Some(content_type) = http::ContentType::parse_flexible(ext.to_str().unwrap()) {
 			return Some(content::Content(content_type, file));
