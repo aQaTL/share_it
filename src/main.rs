@@ -3,17 +3,20 @@
 use rocket::{
 	get, handler,
 	request::{Request, State},
-	response::content,
+	response,
+	response::{content, NamedFile},
+	http,
 	config::{Config, Environment},
-};
-use rocket_contrib::{
-	serve::StaticFiles,
 };
 use std::{
 	path::PathBuf,
 	fs,
 };
 use serde_derive::Serialize;
+
+mod frontend;
+
+use crate::frontend::*;
 
 fn clap_app() -> clap::App<'static, 'static> {
 	use clap::*;
@@ -27,11 +30,11 @@ fn clap_app() -> clap::App<'static, 'static> {
 			.index(1)
 			.default_value("."))
 		.arg(Arg::with_name("name")
-			.help("e.g. `--name foo` will result in sharing the resource on `/foo`")
+			.help("e.g. `--name foo` will result in sharing the resource on `/s/foo`")
 			.short("n")
 			.takes_value(true)
-			.empty_values(false)
-			.default_value("s"))
+			.empty_values(true)
+			.default_value(""))
 		.arg(Arg::with_name("address")
 			.help("ip of the network interface on which the application will serve")
 			.long("address")
@@ -98,17 +101,11 @@ fn main() {
 		println!("{}", e);
 	}
 
-	let mut static_files: Vec<rocket::Route> = StaticFiles::new(
-		resource, rocket_contrib::serve::Options::DotFiles).into();
-	let get_dir_ls_route = rocket::Route::new(rocket::http::Method::Get, "/", get_dir_ls);
-	static_files.push(get_dir_ls_route.clone());
-
 	rocket::custom(config)
-		.mount(&format!("/{}", name), static_files)
-		.mount("/index", vec![get_dir_ls_route])
-		.mount("/", rocket::routes![index])
-//		.mount("/frontend", ) //TODO serving frontend files included in binary (include! macro)
+		.mount("/index", vec![rocket::Route::new(http::Method::Get, "/", get_dir_ls)])
+		.mount("/", rocket::routes![index, serve_frontend, serve_resource, serve_resource_backfire])
 		.manage(ResourceDir(resource_dir)) //TODO handle dir content changes
+		.manage(frontend_files())
 		.launch();
 }
 
@@ -116,15 +113,35 @@ fn main() {
 struct ResourceDir(Vec<String>);
 
 #[get("/")]
-fn index() -> content::Html<&'static str> {
-	content::Html(include_str!("../frontend/index.html"))
+fn index(frontend_files: State<FrontendFiles>) -> content::Html<&'static str> {
+	content::Html(frontend_files.get("index.html").unwrap())
+}
+
+#[get("/<resource..>", rank=2)]
+fn serve_frontend(frontend_files: State<FrontendFiles>, resource: PathBuf) -> Option<content::Content<&'static str>> {
+	let file = frontend_files.get(resource.to_str().unwrap())?;
+	if let Some(ext) = resource.extension() {
+		if let Some(content_type) = http::ContentType::parse_flexible(ext.to_str().unwrap()) {
+			return Some(content::Content(content_type, file));
+		}
+	}
+	Some(content::Content(http::ContentType::Plain, file))
 }
 
 fn get_dir_ls<'r>(req: &'r Request, _: rocket::Data) -> handler::Outcome<'r> {
 	let resource_dir = req.guard::<State<ResourceDir>>().unwrap().inner();
-	rocket::Outcome::from(req, rocket::response::content::Json(serde_json::to_string(resource_dir)))
+	rocket::Outcome::from(req, response::content::Json(serde_json::to_string(resource_dir)))
 }
 
+#[get("/s/<resource..>", rank=1)]
+fn serve_resource(resource_dir: State<ResourceDir>, resource: PathBuf) -> String {
+	format!("{:?}", resource)
+}
+
+#[get("/s/<resource>", rank=3)]
+fn serve_resource_backfire(resource: String) -> String {
+	format!("backfire: {:?}", resource)
+}
 
 fn graceful_exit(err: &str) {
 	eprintln!("{}", err);
