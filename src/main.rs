@@ -1,10 +1,10 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+#![feature(proc_macro_hygiene, decl_macro, uniform_paths)]
 
 use rocket::{
 	get, handler,
 	request::{Request, State},
 	response,
-	response::{content, NamedFile},
+	response::{content},
 	http,
 	config::{Config, Environment},
 };
@@ -12,11 +12,13 @@ use std::{
 	path::PathBuf,
 	fs,
 };
-use serde_derive::Serialize;
+use serde::Serialize;
 
 mod frontend;
+mod staticfiles;
 
-use crate::frontend::*;
+use crate::{frontend::*, staticfiles::*};
+use rocket::Route;
 
 fn clap_app() -> clap::App<'static, 'static> {
 	use clap::*;
@@ -101,10 +103,11 @@ fn main() {
 		println!("{}", e);
 	}
 
+	let mut routes = rocket::routes![index, serve_frontend];
+	routes.append(&mut StaticFilesBrowser::new(resource).into());
+
 	rocket::custom(config)
-		.mount("/index", vec![rocket::Route::new(http::Method::Get, "/", get_dir_ls)])
-		.mount("/", rocket::routes![index, serve_frontend, serve_resource, serve_resource_backfire])
-		.manage(ResourceDir(resource_dir)) //TODO handle dir content changes
+		.mount("/", routes)
 		.launch();
 }
 
@@ -125,21 +128,6 @@ fn serve_frontend(resource: PathBuf) -> Option<content::Content<&'static str>> {
 		}
 	}
 	Some(content::Content(http::ContentType::Plain, file))
-}
-
-fn get_dir_ls<'r>(req: &'r Request, _: rocket::Data) -> handler::Outcome<'r> {
-	let resource_dir = req.guard::<State<ResourceDir>>().unwrap().inner();
-	rocket::Outcome::from(req, response::content::Json(serde_json::to_string(resource_dir)))
-}
-
-#[get("/s/<resource..>", rank=1)]
-fn serve_resource(resource_dir: State<ResourceDir>, resource: PathBuf) -> String {
-	format!("{:?}", resource)
-}
-
-#[get("/s/<resource>", rank=3)]
-fn serve_resource_backfire(resource: String) -> String {
-	format!("backfire: {:?}", resource)
 }
 
 fn graceful_exit(err: &str) {

@@ -3,6 +3,7 @@ use std::fs;
 use std::io::Write;
 
 fn main() -> Result<(), std::io::Error> {
+	println!("cargo:rerun-if-changed=frontend");
 	let frontend_files = WalkDir::new("frontend")
 		.into_iter()
 		.filter_map(|e| e.ok())
