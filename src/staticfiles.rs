@@ -1,7 +1,6 @@
 use std::path::{PathBuf, Path};
 use std::fs;
 use rocket::*;
-use walkdir::WalkDir;
 use rocket::{
 	outcome::IntoOutcome,
 	response::NamedFile,
@@ -65,12 +64,6 @@ impl Handler for StaticFilesBrowser {
 					name: entry.file_name().into_string().unwrap(),
 				});
 			}
-
-//			let resource_dir = WalkDir::new(path.clone())
-//				.into_iter()
-//				.filter_map(|e| e.ok())
-//				.map(|e| e.file_name().to_owned().into_string().unwrap())
-//				.collect::<Vec<_>>();
 			Outcome::from(req, response::content::Json(serde_json::to_string(&resource_dir)))
 		} else {
 			Outcome::from(req, NamedFile::open(&path).ok())

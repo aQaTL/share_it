@@ -1,9 +1,7 @@
 #![feature(proc_macro_hygiene, decl_macro, uniform_paths)]
 
 use rocket::{
-	get, handler,
-	request::{Request, State},
-	response,
+	get,
 	response::{content},
 	http,
 	config::{Config, Environment},
@@ -18,7 +16,6 @@ mod frontend;
 mod staticfiles;
 
 use crate::{frontend::*, staticfiles::*};
-use rocket::Route;
 
 fn clap_app() -> clap::App<'static, 'static> {
 	use clap::*;
