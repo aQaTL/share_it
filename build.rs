@@ -1,6 +1,6 @@
 use walkdir::WalkDir;
 use std::fs;
-use std::io::Write;
+use std::io::{Write, ErrorKind};
 
 fn main() -> Result<(), std::io::Error> {
 	println!("cargo:rerun-if-changed=frontend");
@@ -14,6 +14,13 @@ fn main() -> Result<(), std::io::Error> {
 								env!("CARGO_MANIFEST_DIR").replace("\\", "/"),
 								filename))
 		.collect::<String>();
+
+	match fs::create_dir("src/generated") {
+		Err(e) if e.kind() != ErrorKind::NotFound => {
+			return Err(e)
+		},
+		_ => (),
+	}
 
 	let mut frontend_files_file = fs::File::create("src/generated/frontend_files.array")?;
 	frontend_files_file.write_all(b"[")?;
