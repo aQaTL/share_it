@@ -59,8 +59,10 @@ function dragoverHandler(ev) {
     ev.preventDefault();
 }
 
-async function updateProgress(idx, percentage) {
-    console.debug(`file ${idx} upload ${percentage}%`);
+async function updateProgress(percentage) {
+    console.debug(`Upload progress ${percentage}%`);
+    let bar = document.getElementById("uploadBoxProgress").ldBar;
+    bar.set(percentage);
 }
 
 async function dropHandler(ev) {
@@ -72,13 +74,15 @@ async function dropHandler(ev) {
         let file = ev.dataTransfer.files[i];
         console.log(`Uploading file ${file.name} weighing ${file.size}`);
 
+        openUploadBox(file.name);
+
         let filenameParam = encodeURIComponent(file.name);
         try {
             let uploadRequest = new Promise(((resolve, reject) => {
                 let req = new XMLHttpRequest();
                 req.open("POST", `/upload/${filenameParam}`, true);
                 req.upload.addEventListener("progress", async (e) => {
-                    await updateProgress(i, (e.loaded * 100.0 / e.total) || 100);
+                    await updateProgress(i, Math.round((e.loaded * 100.0 / e.total) || 100));
                 });
                 req.addEventListener("readystatechange", (e) => {
                     if (req.readyState !== 4) {
@@ -102,6 +106,8 @@ async function dropHandler(ev) {
 
         } catch (e) {
             console.error("Failed to upload file: ", e);
+        } finally {
+            closeUploadBox();
         }
     }
 }
@@ -110,4 +116,33 @@ window.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("dragstart", dragstartHandler);
     document.addEventListener("dragover", dragoverHandler);
     document.addEventListener("drop", dropHandler);
-})
+});
+
+function openUploadBox(filename) {
+    let uploadBox = document.getElementById("uploadBox");
+    let uploadFilename = uploadBox.querySelector("#uploadFilename");
+
+    uploadFilename.textContent = filename;
+    uploadBox.style.display = "block";
+
+    updateProgress(0, 0);
+}
+
+function closeUploadBox() {
+    let uploadBox = document.getElementById("uploadBox");
+    uploadBox.style.display = "none";
+}
+
+// When the user clicks anywhere outside of the modal, close it
+window.onclick = function (event) {
+    let uploadBox = document.getElementById("uploadBox");
+    if (event.target === uploadBox) {
+        uploadBox.style.display = "none";
+    }
+}
+
+window.addEventListener("keypress", ev => {
+    if (ev.key === "Escape") {
+        closeUploadBox();
+    }
+});

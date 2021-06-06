@@ -1,40 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<title>Share it</title>
+    <meta charset="UTF-8">
+    <title>Share it</title>
 
-	<link rel="stylesheet" href="mini-dark.min.css">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-	<script src="load_files.js"></script>
+    <link rel="stylesheet" href="mini-dark.min.css">
+    <link rel="stylesheet" type="text/css" href="loading-bar.min.css"/>
+    <script type="text/javascript" src="loading-bar.min.js"></script>
 
-	<style>
-		main {
-			margin: 1em;
-		}
+    <script src="load_files.js"></script>
 
-		.dir, .dir:link, .dir:visited {
-			color: #ffa500;
-		}
+    <style>
+        main {
+            margin: 1em;
+        }
 
-		.file, .file:link, .file:visited {
-			color: #45afea;
-		}
+        .dir, .dir:link, .dir:visited {
+            color: #ffa500;
+        }
 
-		#backBtn, #backBtn:visited {
-			color: #308732;
-		}
-	</style>
+        .file, .file:link, .file:visited {
+            color: #45afea;
+        }
+
+        #backBtn, #backBtn:visited {
+            color: #308732;
+        }
+
+        .uploadBoxModal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0.0, 0.0, 0.0, 0.4);
+        }
+
+        .uploadBoxModal > .uploadBoxModalContent {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #424242;
+            margin: 15% auto; /* 15% from the top and centered */
+            padding-top: 2em;
+            padding-left: 10em;
+            padding-right: 10em;
+            padding-bottom: 5em;
+            border: none;
+            border-radius: 10px;
+            width: fit-content;
+            width: -moz-fit-content;
+            color: #45afea;
+        }
+
+        #uploadBoxProgress {
+            text-align: center;
+            width: 300px !important;
+            height: 50px !important;
+        }
+
+        #uploadBoxProgress svg {
+
+        }
+    </style>
 </head>
 <body>
-	<h1>Share it</h1>
-	<main>
-		<span id="curr_path"></span><br>
-		<span>Your files:</span><br>
-		<a id="backBtn" href="javascript: void(0)" onclick="load_previous_dir()">Back</a><br>
-		<div id="files_view">
-		</div>
-	</main>
+<h1>Share it</h1>
+<main>
+    <span id="curr_path"></span><br>
+    <span>Your files:</span><br>
+    <a id="backBtn" href="javascript: void(0)" onclick="load_previous_dir()">Back</a><br>
+    <div id="files_view">
+    </div>
+</main>
+
+<div id="uploadBox" class="uploadBoxModal">
+    <div class="uploadBoxModalContent">
+        <h3>Uploading <span id="uploadFilename"></span></h3>
+        <div id="uploadBoxProgress" class="ldBar" data-value="0" data-preset="energy"
+        >
+        </div>
+    </div>
+</div>
 </body>
 </html>
