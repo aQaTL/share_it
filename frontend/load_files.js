@@ -59,6 +59,10 @@ function dragoverHandler(ev) {
     ev.preventDefault();
 }
 
+async function updateProgress(idx, percentage) {
+    console.debug(`file ${idx} upload ${percentage}%`);
+}
+
 async function dropHandler(ev) {
     ev.stopPropagation();
     ev.preventDefault();
@@ -70,11 +74,28 @@ async function dropHandler(ev) {
 
         let filenameParam = encodeURIComponent(file.name);
         try {
-            let result = await fetch(`/upload/${filenameParam}`, {
-                method: "POST",
-                body: file,
-            });
-            console.log("File upload succeeded with ", result);
+            let uploadRequest = new Promise(((resolve, reject) => {
+                let req = new XMLHttpRequest();
+                req.open("POST", `/upload/${filenameParam}`, true);
+                req.upload.addEventListener("progress", async (e) => {
+                    await updateProgress(i, (e.loaded * 100.0 / e.total) || 100);
+                });
+                req.addEventListener("readystatechange", (e) => {
+                    if (req.readyState !== 4) {
+                        return;
+                    }
+
+                    if (req.status === 200) {
+                        resolve(undefined);
+                    } else {
+                        reject(req.response);
+                    }
+                });
+                req.send(file);
+            }));
+
+            await uploadRequest;
+            console.debug("File upload succeeded");
 
             dir_stack = [""];
             display_files("", await load_files(""));
