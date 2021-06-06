@@ -64,8 +64,8 @@
             height: 50px !important;
         }
 
-        #uploadBoxProgress svg {
-
+        #uploadBoxHeader {
+            max-width: 60%;
         }
     </style>
 </head>
@@ -81,7 +81,7 @@
 
 <div id="uploadBox" class="uploadBoxModal">
     <div class="uploadBoxModalContent">
-        <h3>Uploading <span id="uploadFilename"></span></h3>
+        <h3 id="uploadBoxHeader">Uploading <span id="uploadFilename"></span></h3>
         <div id="uploadBoxProgress" class="ldBar" data-value="0" data-preset="energy"
         >
         </div>
