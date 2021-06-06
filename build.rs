@@ -11,7 +11,7 @@ fn main() -> Result<(), std::io::Error> {
 		.map(|e| e.path().to_str().unwrap().replace("\\", "/"))
 		.map(|filename| {
 			format!(
-				"(\"{}\", include_str!(\"{}/{}\")), ",
+				"(\"{}\", include_bytes!(\"{}/{}\").as_slice()), ",
 				filename.trim_start_matches("frontend/").to_owned(),
 				env!("CARGO_MANIFEST_DIR").replace("\\", "/"),
 				filename

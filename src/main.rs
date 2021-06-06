@@ -1,4 +1,4 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+#![feature(proc_macro_hygiene, decl_macro, array_methods)]
 
 use rocket::{
 	config::{Config, Environment},
@@ -124,12 +124,12 @@ fn main() {
 struct ResourceDir(Vec<String>);
 
 #[get("/")]
-fn index() -> content::Html<&'static str> {
+fn index() -> content::Html<&'static [u8]> {
 	content::Html(FRONTEND_FILES.get("index.html").unwrap())
 }
 
 #[get("/<resource..>", rank = 2)]
-fn serve_frontend(resource: PathBuf) -> Option<content::Content<&'static str>> {
+fn serve_frontend(resource: PathBuf) -> Option<content::Content<&'static [u8]>> {
 	let file = FRONTEND_FILES.get(resource.to_str().unwrap())?;
 	if let Some(ext) = resource.extension() {
 		if let Some(content_type) = http::ContentType::parse_flexible(ext.to_str().unwrap()) {

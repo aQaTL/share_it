@@ -8,13 +8,33 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 
 	<script src="load_files.js"></script>
+
+	<style>
+		main {
+			margin: 1em;
+		}
+
+		.dir, .dir:visited {
+			color: #ffa500;
+		}
+
+		.file, .file:link, .file:visited {
+			color: #45afea;
+		}
+
+		#backBtn, #backBtn:visited {
+			color: #308732;
+		}
+	</style>
 </head>
 <body>
 	<h1>Share it</h1>
-	<span id="curr_path"></span><br>
-	<span>Your files:</span><br>
-	<a href="#" onclick="load_previous_dir()">Back</a><br>
-	<div id="files_view">
-	</div>
+	<main>
+		<span id="curr_path"></span><br>
+		<span>Your files:</span><br>
+		<a id="backBtn" href="#" onclick="load_previous_dir()">Back</a><br>
+		<div id="files_view">
+		</div>
+	</main>
 </body>
 </html>
