@@ -14,7 +14,7 @@
 			margin: 1em;
 		}
 
-		.dir, .dir:visited {
+		.dir, .dir:link, .dir:visited {
 			color: #ffa500;
 		}
 
@@ -32,7 +32,7 @@
 	<main>
 		<span id="curr_path"></span><br>
 		<span>Your files:</span><br>
-		<a id="backBtn" href="#" onclick="load_previous_dir()">Back</a><br>
+		<a id="backBtn" href="javascript: void(0)" onclick="load_previous_dir()">Back</a><br>
 		<div id="files_view">
 		</div>
 	</main>

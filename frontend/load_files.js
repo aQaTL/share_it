@@ -19,7 +19,7 @@ const display_files = (root, files) => el_id("files_view").innerHTML =
     files.reduce((accumulator, file) => {
         let file_path = root + encodeURI(file.name);
         return accumulator + (file.e_type === "Dir" ?
-            `</li><a class="dir" href="#" onclick="on_dir_click('${file_path}/')">${file.name}</a><br>`
+            `</li><a class="dir" href="javascript: void(0)" onclick="on_dir_click('${file_path}/')">${file.name}</a><br>`
             :
             `</li><a class="file" href="s/${file_path}">${file.name}</a><br>`);
     }, "");
