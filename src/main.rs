@@ -1,11 +1,12 @@
 #![feature(proc_macro_hygiene, decl_macro, array_methods)]
 
+use anyhow::{bail, Context, Result};
 use rocket::{
 	config::{Config, Environment},
-	get, http,
+	get, http, post,
 	response::content,
+	Data, State,
 };
-use serde::Serialize;
 use std::{fs, path::PathBuf};
 
 mod frontend;
@@ -51,19 +52,15 @@ fn clap_app() -> clap::App<'static, 'static> {
 		)
 }
 
-fn main() {
+fn main() -> Result<()> {
 	let app = clap_app().get_matches();
 	let port = app.value_of("port").unwrap();
-	let port = match port.parse::<u16>() {
-		Ok(port) => port,
-		Err(_) => {
-			graceful_exit(&format!(
-				"Invalid value, could not parse `{}` as a port number (0 - 65535)",
-				port
-			));
-			0
-		}
-	};
+	let port = port.parse::<u16>().with_context(|| {
+		format!(
+			"Invalid port value, could not parse `{}` as a port number (0 - 65535)",
+			port
+		)
+	})?;
 
 	let address = app.value_of("address").unwrap();
 	let name = app.value_of("name").unwrap();
@@ -71,24 +68,16 @@ fn main() {
 	let resource_str = app.value_of("resource").unwrap();
 	let resource = PathBuf::from(resource_str);
 	if !resource.exists() {
-		graceful_exit(&format!("{} not found", resource_str));
+		bail!("{} not found", resource_str);
 	}
 	let mut resource = resource.canonicalize().unwrap();
 	if resource.is_file() {
 		resource.pop();
 	}
 
-	let resource_dir = match fs::read_dir(resource.clone()) {
-		Ok(dir) => dir.collect::<Vec<_>>(),
-		Err(err) => {
-			graceful_exit(&format!(
-				"error reading {}: {}",
-				resource.display(),
-				err.to_string()
-			));
-			unreachable!()
-		}
-	};
+	let resource_dir: Vec<_> = fs::read_dir(resource.clone())
+		.with_context(|| format!("error reading {:?}", resource,))?
+		.collect();
 
 	println!(
 		"Sharing {} on {}:{}/{}/",
@@ -114,14 +103,20 @@ fn main() {
 		println!("{}", e);
 	}
 
-	let mut routes = rocket::routes![index, serve_frontend];
-	routes.append(&mut StaticFilesBrowser::new(resource).into());
+	let mut routes = rocket::routes![index, serve_frontend, upload];
+	routes.append(&mut StaticFilesBrowser::new(resource.clone()).into());
 
-	rocket::custom(config).mount("/", routes).launch();
+	Result::<(), _>::Err(
+		rocket::custom(config)
+			.manage(ResourceDir(resource))
+			.mount("/", routes)
+			.launch(),
+	)?;
+
+	Ok(())
 }
 
-#[derive(Serialize)]
-struct ResourceDir(Vec<String>);
+struct ResourceDir(PathBuf);
 
 #[get("/")]
 fn index() -> content::Html<&'static [u8]> {
@@ -139,7 +134,14 @@ fn serve_frontend(resource: PathBuf) -> Option<content::Content<&'static [u8]>> 
 	Some(content::Content(http::ContentType::Plain, file))
 }
 
-fn graceful_exit(err: &str) {
-	eprintln!("{}", err);
-	std::process::exit(1);
+#[post("/upload/<filename..>", data = "<file>")]
+fn upload(
+	filename: PathBuf,
+	file: Data,
+	resource_dir: State<ResourceDir>,
+) -> Result<(), std::io::Error> {
+	let file_path = resource_dir.0.join(filename);
+	file.stream_to_file(file_path)?;
+
+	Ok(())
 }

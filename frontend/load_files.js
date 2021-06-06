@@ -46,3 +46,47 @@ async function load_previous_dir() {
         display_files("", files);
     }
 })();
+
+function dragstartHandler(ev) {
+    console.debug("dragstart");
+    ev.stopPropagation();
+    ev.preventDefault();
+}
+
+function dragoverHandler(ev) {
+    console.debug("dragover");
+    ev.stopPropagation();
+    ev.preventDefault();
+}
+
+async function dropHandler(ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+
+    console.debug("drop");
+    for (let i = 0; i < ev.dataTransfer.files.length; i++) {
+        let file = ev.dataTransfer.files[i];
+        console.log(`Uploading file ${file.name} weighing ${file.size}`);
+
+        let filenameParam = encodeURIComponent(file.name);
+        try {
+            let result = await fetch(`/upload/${filenameParam}`, {
+                method: "POST",
+                body: file,
+            });
+            console.log("File upload succeeded with ", result);
+
+            dir_stack = [""];
+            display_files("", await load_files(""));
+
+        } catch (e) {
+            console.error("Failed to upload file: ", e);
+        }
+    }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("dragstart", dragstartHandler);
+    document.addEventListener("dragover", dragoverHandler);
+    document.addEventListener("drop", dropHandler);
+})
