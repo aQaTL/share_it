@@ -81,8 +81,8 @@ async function dropHandler(ev) {
             let uploadRequest = new Promise(((resolve, reject) => {
                 let req = new XMLHttpRequest();
                 req.open("POST", `/upload/${filenameParam}`, true);
-                req.upload.addEventListener("progress", async (e) => {
-                    await updateProgress(i, Math.round((e.loaded * 100.0 / e.total) || 100));
+                req.upload.addEventListener("progress", (e) => {
+                    updateProgress(Math.round((e.loaded * 100.0 / e.total) || 100));
                 });
                 req.addEventListener("readystatechange", (e) => {
                     if (req.readyState !== 4) {
@@ -125,7 +125,7 @@ function openUploadBox(filename) {
     uploadFilename.textContent = filename;
     uploadBox.style.display = "block";
 
-    updateProgress(0, 0);
+    updateProgress(0);
 }
 
 function closeUploadBox() {
