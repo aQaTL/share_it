@@ -1,6 +1,6 @@
-use walkdir::WalkDir;
 use std::fs;
-use std::io::{Write, ErrorKind};
+use std::io::{ErrorKind, Write};
+use walkdir::WalkDir;
 
 fn main() -> Result<(), std::io::Error> {
 	println!("cargo:rerun-if-changed=frontend");
@@ -9,16 +9,18 @@ fn main() -> Result<(), std::io::Error> {
 		.filter_map(|e| e.ok())
 		.filter(|e| e.path().is_file())
 		.map(|e| e.path().to_str().unwrap().replace("\\", "/"))
-		.map(|filename| format!("(\"{}\", include_str!(\"{}/{}\")), ",
-								filename.trim_start_matches("frontend/").to_owned(),
-								env!("CARGO_MANIFEST_DIR").replace("\\", "/"),
-								filename))
+		.map(|filename| {
+			format!(
+				"(\"{}\", include_str!(\"{}/{}\")), ",
+				filename.trim_start_matches("frontend/").to_owned(),
+				env!("CARGO_MANIFEST_DIR").replace("\\", "/"),
+				filename
+			)
+		})
 		.collect::<String>();
 
 	match fs::create_dir("src/generated") {
-		Err(e) if e.kind() != ErrorKind::NotFound => {
-			return Err(e)
-		},
+		Err(e) if e.kind() != ErrorKind::AlreadyExists => return Err(e),
 		_ => (),
 	}
 

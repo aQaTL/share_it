@@ -1,13 +1,13 @@
-use std::path::{PathBuf, Path};
-use std::fs;
 use rocket::*;
 use rocket::{
+	handler::Outcome,
+	http::{uri::Segments, Method, Status},
 	outcome::IntoOutcome,
 	response::NamedFile,
-	handler::Outcome,
-	http::{Method, Status, uri::Segments},
 };
 use serde::Serialize;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone)]
 pub struct StaticFilesBrowser {
@@ -24,8 +24,10 @@ impl StaticFilesBrowser {
 
 impl Into<Vec<Route>> for StaticFilesBrowser {
 	fn into(self) -> Vec<Route> {
-		vec![Route::ranked(-3, Method::Get, "/s/<resource..>", self.clone()),
-			 Route::ranked(-3, Method::Get, "/s", self)]
+		vec![
+			Route::ranked(-3, Method::Get, "/s/<resource..>", self.clone()),
+			Route::ranked(-3, Method::Get, "/s", self),
+		]
 	}
 }
 
@@ -60,11 +62,18 @@ impl Handler for StaticFilesBrowser {
 			let mut resource_dir = Vec::new();
 			for entry in dir_iter.filter_map(|e| e.ok()) {
 				resource_dir.push(Entry {
-					e_type: if entry.path().is_dir() { Type::Dir } else { Type::File },
+					e_type: if entry.path().is_dir() {
+						Type::Dir
+					} else {
+						Type::File
+					},
 					name: entry.file_name().into_string().unwrap(),
 				});
 			}
-			Outcome::from(req, response::content::Json(serde_json::to_string(&resource_dir)))
+			Outcome::from(
+				req,
+				response::content::Json(serde_json::to_string(&resource_dir)),
+			)
 		} else {
 			Outcome::from(req, NamedFile::open(&path).ok())
 		}
