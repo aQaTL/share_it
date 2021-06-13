@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use rocket::{
-	config::{Config, Environment},
+	config::{Config, Environment, Limits, LoggingLevel},
 	get, http, post,
 	response::content,
 	Data, State,
@@ -90,6 +90,9 @@ fn main() -> Result<()> {
 	let config = Config::build(Environment::Production)
 		.address(address)
 		.port(port)
+		.log_level(LoggingLevel::Normal)
+		// 1GiB file upload limit
+		.limits(Limits::new().limit("forms", 1 * 1024 * 1024 * 1024))
 		.finalize()
 		.unwrap();
 

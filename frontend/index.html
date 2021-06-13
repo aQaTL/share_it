@@ -72,6 +72,10 @@
 <body>
 <h1>Share it</h1>
 <main>
+    <div>
+        <input id="fileSelector" type="file" multiple>
+        <input id="uploadButton" type="button" value="Upload" onclick="onUploadButtonClick()">
+    </div>
     <span id="curr_path"></span><br>
     <span>Your files:</span><br>
     <a id="backBtn" href="javascript: void(0)" onclick="load_previous_dir()">Back</a><br>

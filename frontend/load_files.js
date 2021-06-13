@@ -59,7 +59,7 @@ function dragoverHandler(ev) {
     ev.preventDefault();
 }
 
-async function updateProgress(percentage) {
+function updateProgress(percentage) {
     console.debug(`Upload progress ${percentage}%`);
     let bar = document.getElementById("uploadBoxProgress").ldBar;
     bar.set(percentage);
@@ -72,43 +72,47 @@ async function dropHandler(ev) {
     console.debug("drop");
     for (let i = 0; i < ev.dataTransfer.files.length; i++) {
         let file = ev.dataTransfer.files[i];
-        console.log(`Uploading file ${file.name} weighing ${file.size}`);
+        await uploadFile(file)
+    }
+}
 
-        openUploadBox(file.name);
+async function uploadFile(file) {
+    console.log(`Uploading file ${file.name} weighing ${file.size}`);
 
-        let filenameParam = encodeURIComponent(file.name);
-        try {
-            let uploadRequest = new Promise(((resolve, reject) => {
-                let req = new XMLHttpRequest();
-                req.open("POST", `/upload/${filenameParam}`, true);
-                req.upload.addEventListener("progress", (e) => {
-                    updateProgress(Math.round((e.loaded * 100.0 / e.total) || 100));
-                });
-                req.addEventListener("readystatechange", (e) => {
-                    if (req.readyState !== 4) {
-                        return;
-                    }
+    openUploadBox(file.name);
 
-                    if (req.status === 200) {
-                        resolve(undefined);
-                    } else {
-                        reject(req.response);
-                    }
-                });
-                req.send(file);
-            }));
+    let filenameParam = encodeURIComponent(file.name);
+    try {
+        let uploadRequest = new Promise(((resolve, reject) => {
+            let req = new XMLHttpRequest();
+            req.open("POST", `/upload/${filenameParam}`, true);
+            req.upload.addEventListener("progress", (e) => {
+                updateProgress(Math.round((e.loaded * 100.0 / e.total) || 100));
+            });
+            req.addEventListener("readystatechange", (e) => {
+                if (req.readyState !== 4) {
+                    return;
+                }
 
-            await uploadRequest;
-            console.debug("File upload succeeded");
+                if (req.status === 200) {
+                    resolve(undefined);
+                } else {
+                    reject(req.response);
+                }
+            });
+            req.send(file);
+        }));
 
-            dir_stack = [""];
-            display_files("", await load_files(""));
+        await uploadRequest;
+        console.debug("File upload succeeded");
 
-        } catch (e) {
-            console.error("Failed to upload file: ", e);
-        } finally {
-            closeUploadBox();
-        }
+        dir_stack = [""];
+        display_files("", await load_files(""));
+
+    } catch (e) {
+        console.error("Failed to upload file: ", e);
+    } finally {
+        closeUploadBox();
     }
 }
 
@@ -131,6 +135,15 @@ function openUploadBox(filename) {
 function closeUploadBox() {
     let uploadBox = document.getElementById("uploadBox");
     uploadBox.style.display = "none";
+}
+
+async function onUploadButtonClick(_event) {
+    let fileSelector = document.getElementById("fileSelector");
+    let files = fileSelector.files;
+    for (let i = 0; i < files.length; i++) {
+        await uploadFile(files[i]);
+    }
+    fileSelector.value = "";
 }
 
 // When the user clicks anywhere outside of the modal, close it
