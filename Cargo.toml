@@ -5,6 +5,10 @@ authors = ["aQaTL <mmsoltys@outlook.com>"]
 edition = "2018"
 license = "MIT"
 
+[features]
+default = ["systemd"]
+systemd = []
+
 [dependencies]
 anyhow = "1.0"
 clap = "2"
