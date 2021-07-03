@@ -36,3 +36,36 @@ On Ubuntu, you only need to get the systemd's dev package, like so:
 ```
 sudo apt install libsystemd-dev
 ```
+
+# Systemd service
+
+- Create a service unit file in `/etc/systemd/system/shareit.service` with contents:
+
+```
+[Unit]
+Description=ShareIt
+
+[Service]
+ExecStart=/home/aqatl/dev/rust/share_it/target/debug/share_it /home/aqatl/Public
+User=aqatl
+
+[Install]
+WantedBy=mutli-user.target
+```
+
+- Create a socket file in `/etc/systemd/system/shareit.socket` with contents:
+
+```
+[Socket]
+ListenStream=80
+BindIPv6Only=both
+Accept=no
+
+[Install]
+WantedBy=sockets.target
+```
+
+- Run `sudo systemctl daemon-reload`
+- Run `sudo systemctl start shareit.socket`
+- Run `sudo systemctl start shareit`
+- Check if the service is running with `sudo systemctl status shareit`
