@@ -46,8 +46,8 @@ sudo apt install libsystemd-dev
 Description=ShareIt
 
 [Service]
-ExecStart=/home/aqatl/dev/rust/share_it/target/debug/share_it /home/aqatl/Public
-User=aqatl
+ExecStart=/path/to/shareit/binary /path/to/a/dir/you/want/to/share
+User=your_username
 
 [Install]
 WantedBy=mutli-user.target
