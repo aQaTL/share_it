@@ -1,13 +1,16 @@
-use rocket::*;
-use rocket::{
-	handler::Outcome,
-	http::{uri::Segments, Method, Status},
-	outcome::IntoOutcome,
-	response::NamedFile,
+use actix_service::{Service, ServiceFactory};
+use actix_web::dev::{
+	AnyBody, AppService, HttpServiceFactory, ResourceDef, ServiceRequest, ServiceResponse,
 };
+use actix_web::http::{header, Method, StatusCode};
+use actix_web::{HttpResponse, Responder, ResponseError};
+use futures::future::{ok, ready, LocalBoxFuture};
+use log::info;
 use serde::Serialize;
+use std::fmt::Display;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::task::{Context, Poll};
 
 #[derive(Clone)]
 pub struct StaticFilesBrowser {
@@ -19,15 +22,6 @@ impl StaticFilesBrowser {
 		StaticFilesBrowser {
 			root: path.as_ref().into(),
 		}
-	}
-}
-
-impl Into<Vec<Route>> for StaticFilesBrowser {
-	fn into(self) -> Vec<Route> {
-		vec![
-			Route::ranked(-3, Method::Get, "/s/<resource..>", self.clone()),
-			Route::ranked(-3, Method::Get, "/s", self),
-		]
 	}
 }
 
@@ -43,19 +37,55 @@ enum Type {
 	Dir,
 }
 
-impl Handler for StaticFilesBrowser {
-	fn handle<'r>(&self, req: &'r Request, _: Data) -> Outcome<'r> {
-		let route = req.route().expect("route() is None");
-		let is_segments_route = route.uri.path().ends_with(">");
-		let path = if !is_segments_route {
-			self.root.clone()
-		} else {
-			req.get_segments::<Segments>(1)
-				.and_then(|res| res.ok())
-				.and_then(|segments| segments.into_path_buf(true).ok())
-				.map(|path| self.root.join(path))
-				.into_outcome(Status::NotFound)?
+#[derive(Debug)]
+enum StaticFilesBrowserError {
+	NotFound,
+}
+
+impl Display for StaticFilesBrowserError {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "{:?}", self)
+	}
+}
+
+impl ResponseError for StaticFilesBrowserError {
+	fn status_code(&self) -> StatusCode {
+		use StaticFilesBrowserError::*;
+		match self {
+			NotFound => StatusCode::NOT_FOUND,
+		}
+	}
+
+	fn error_response(&self) -> HttpResponse<AnyBody> {
+		use StaticFilesBrowserError::*;
+		match self {
+			NotFound => crate::not_found(),
+		}
+	}
+}
+
+impl StaticFilesBrowser {
+	fn handle(&self, req: ServiceRequest) -> Result<ServiceResponse, actix_web::Error> {
+		let (http_req, _) = req.into_parts();
+
+		let path = {
+			let path = percent_encoding::percent_decode_str(http_req.uri().path()).decode_utf8()?;
+			let path = path
+				.strip_prefix("/s")
+				.ok_or(StaticFilesBrowserError::NotFound)?;
+			let path = path.strip_prefix("/").unwrap_or(path);
+			self.root.join(path)
 		};
+
+		if !path
+			.canonicalize()
+			.map(|abs_path| abs_path.starts_with(&self.root))
+			.unwrap_or_default()
+		{
+			return Err(StaticFilesBrowserError::NotFound.into());
+		}
+
+		info!("serving {:?}", path);
 
 		if path.is_dir() {
 			let dir_iter = fs::read_dir(path.as_path()).unwrap();
@@ -70,12 +100,57 @@ impl Handler for StaticFilesBrowser {
 					name: entry.file_name().into_string().unwrap(),
 				});
 			}
-			Outcome::from(
-				req,
-				response::content::Json(serde_json::to_string(&resource_dir)),
-			)
+
+			let response = HttpResponse::Ok().json(resource_dir).respond_to(&http_req);
+			Ok(ServiceResponse::new(http_req, response))
 		} else {
-			Outcome::from(req, NamedFile::open(&path).ok())
+			let response = actix_files::NamedFile::open(path)?.into_response(&http_req);
+			Ok(ServiceResponse::new(http_req, response))
 		}
+	}
+}
+
+impl HttpServiceFactory for StaticFilesBrowser {
+	fn register(self, config: &mut AppService) {
+		config.register_service(
+			ResourceDef::new(["/s", "/s/", "/s/{resource..}"]),
+			Some(vec![Box::new(actix_web::guard::Get())]),
+			self,
+			None,
+		)
+	}
+}
+
+impl ServiceFactory<ServiceRequest> for StaticFilesBrowser {
+	type Response = ServiceResponse;
+	type Error = actix_web::Error;
+	type Config = ();
+	type Service = Self;
+	type InitError = ();
+	type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+
+	fn new_service(&self, _: Self::Config) -> Self::Future {
+		Box::pin(ready(Ok(self.clone())))
+	}
+}
+
+impl Service<ServiceRequest> for StaticFilesBrowser {
+	type Response = ServiceResponse;
+	type Error = actix_web::Error;
+	type Future = LocalBoxFuture<'static, Result<ServiceResponse, actix_web::Error>>;
+
+	fn poll_ready(&self, _ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		Poll::Ready(Ok(()))
+	}
+
+	fn call(&self, req: ServiceRequest) -> Self::Future {
+		if !matches!(*req.method(), Method::GET) {
+			return Box::pin(ok(req.into_response(
+				actix_web::HttpResponse::MethodNotAllowed()
+					.insert_header(header::ContentType::plaintext())
+					.body("Request did not meet this resource's requirements."),
+			)));
+		}
+		Box::pin(ready(self.handle(req)))
 	}
 }

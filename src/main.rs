@@ -1,13 +1,17 @@
 #![feature(proc_macro_hygiene, decl_macro, array_methods)]
 
-use anyhow::{bail, Context, Result};
-use rocket::{
-	config::{Config, Environment, Limits, LoggingLevel},
-	get, http, post,
-	response::content,
-	Data, State,
+use actix_web::{
+	get,
+	http::header,
+	post,
+	web::{self, PayloadConfig},
+	App, HttpResponse, HttpServer, Responder,
 };
+use anyhow::{anyhow, bail, Context, Result};
+use futures::StreamExt;
+use log::info;
 use std::{fs, path::PathBuf};
+use tokio::io::AsyncWriteExt;
 
 mod frontend;
 mod staticfiles;
@@ -86,6 +90,14 @@ mod systemd {
 }
 
 fn main() -> Result<()> {
+	flexi_logger::init(
+		flexi_logger::LogConfig {
+			..flexi_logger::LogConfig::new()
+		},
+		Some("info".to_string()),
+	)
+	.map_err(|e| anyhow!("Failed to init logger: {}", e))?;
+
 	let app = clap_app().get_matches();
 	let port = app.value_of("port").unwrap();
 	let port = port.parse::<u16>().with_context(|| {
@@ -112,22 +124,13 @@ fn main() -> Result<()> {
 		.with_context(|| format!("error reading {:?}", resource,))?
 		.collect();
 
-	println!(
+	info!(
 		"Sharing {} on {}:{}/{}/",
 		resource.file_name().unwrap().to_string_lossy(),
 		address,
 		port,
 		name
 	);
-
-	let config = Config::build(Environment::Production)
-		.address(address)
-		.port(port)
-		.log_level(LoggingLevel::Normal)
-		// 1GiB file upload limit
-		.limits(Limits::new().limit("forms", 1 * 1024 * 1024 * 1024))
-		.finalize()
-		.unwrap();
 
 	let resource_dir = resource_dir
 		.into_iter()
@@ -136,18 +139,45 @@ fn main() -> Result<()> {
 		.collect::<Vec<_>>();
 
 	for e in &resource_dir {
-		println!("{}", e);
+		info!("{}", e);
 	}
 
-	let mut routes = rocket::routes![index, serve_frontend, upload];
-	routes.append(&mut StaticFilesBrowser::new(resource.clone()).into());
+	actix_web::rt::System::new().block_on(async move {
+		let mut http_server = HttpServer::new(move || {
+			App::new()
+				.app_data(web::Data::new(ResourceDir(resource.clone())))
+				// 1GiB file upload limit
+				.app_data(PayloadConfig::new(1 * 1024 * 1024 * 1024))
+				.service(index)
+				.service(StaticFilesBrowser::new(resource.clone()))
+				.service(upload)
+				.service(serve_frontend)
+				.default_service(web::to(not_found))
+		});
 
-	Result::<(), _>::Err(
-		rocket::custom(config)
-			.manage(ResourceDir(resource))
-			.mount("/", routes)
-			.launch(),
-	)?;
+		#[cfg(all(target_os = "linux", feature = "systemd"))]
+		{
+			match systemd::systemd_socket_activation()? {
+				Some(sockets) => {
+					info!("Using systemd provided sockets instead");
+					for socket in sockets {
+						http_server = http_server.listen(socket)?;
+					}
+				}
+				None => {
+					http_server = http_server.bind(format!("{}:{}", address, port))?;
+				}
+			}
+		}
+		#[cfg(not(all(target_os = "linux", feature = "systemd")))]
+		{
+			http_server = http_server.bind(format!("{}:{}", address, port))?;
+		}
+
+		http_server.run().await?;
+
+		Result::<()>::Ok(())
+	})?;
 
 	Ok(())
 }
@@ -155,29 +185,64 @@ fn main() -> Result<()> {
 struct ResourceDir(PathBuf);
 
 #[get("/")]
-fn index() -> content::Html<&'static [u8]> {
-	content::Html(FRONTEND_FILES.get("index.html").unwrap())
+async fn index() -> HttpResponse {
+	let index_html: &'static [u8] = *FRONTEND_FILES.get("index.html").unwrap();
+	HttpResponse::Ok()
+		.insert_header(header::ContentType::html())
+		.body(index_html)
 }
 
-#[get("/<resource..>", rank = 2)]
-fn serve_frontend(resource: PathBuf) -> Option<content::Content<&'static [u8]>> {
-	let file = FRONTEND_FILES.get(resource.to_str().unwrap())?;
-	if let Some(ext) = resource.extension() {
-		if let Some(content_type) = http::ContentType::parse_flexible(ext.to_str().unwrap()) {
-			return Some(content::Content(content_type, file));
-		}
+pub fn not_found() -> HttpResponse {
+	HttpResponse::NotFound().body(
+		r####"<html>
+<head>
+	<title>404 Not Found</title>
+<head>
+<body>
+	<center>
+		<h1>404 Not Found</h1>
+		<hr>
+		<h3>Share It</h1>
+	</center>
+</body>
+</html>"####,
+	)
+}
+
+#[get("/{resource..}")]
+async fn serve_frontend(resource: web::Path<PathBuf>) -> Option<HttpResponse> {
+	let resource = resource.into_inner();
+	info!("Serving frontend file {:?}", resource);
+	let file: &'static [u8] = *FRONTEND_FILES.get(resource.to_str().unwrap())?;
+	let mut response = HttpResponse::Ok();
+
+	let mime_guess = mime_guess::from_path(resource.as_path());
+	if let Some(mime_guess) = mime_guess.first() {
+		response.content_type(mime_guess);
 	}
-	Some(content::Content(http::ContentType::Plain, file))
+
+	Some(response.body(file))
 }
 
-#[post("/upload/<filename..>", data = "<file>")]
-fn upload(
-	filename: PathBuf,
-	file: Data,
-	resource_dir: State<ResourceDir>,
-) -> Result<(), std::io::Error> {
-	let file_path = resource_dir.0.join(filename);
-	file.stream_to_file(file_path)?;
+#[post("/upload/{filename..}")]
+async fn upload(
+	filename: web::Path<PathBuf>,
+	resource_dir: web::Data<ResourceDir>,
+	payload: web::Payload,
+) -> impl Responder {
+	let filename = filename.into_inner();
+	let mut payload = payload.into_inner();
 
-	Ok(())
+	let file_path = resource_dir.get_ref().0.join(filename);
+
+	let mut file: tokio::fs::File = tokio::fs::File::create(&file_path).await?;
+
+	info!("Writing to file {:?}", file_path);
+
+	while let Some(chunk) = payload.next().await {
+		let chunk = chunk?;
+		file.write_all(chunk.as_ref()).await?;
+	}
+
+	Result::<_, actix_web::Error>::Ok("")
 }
