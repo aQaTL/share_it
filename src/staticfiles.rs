@@ -73,7 +73,7 @@ impl StaticFilesBrowser {
 			let path = path
 				.strip_prefix("/s")
 				.ok_or(StaticFilesBrowserError::NotFound)?;
-			let path = path.strip_prefix("/").unwrap_or(path);
+			let path = path.strip_prefix('/').unwrap_or(path);
 			self.root.join(path)
 		};
 

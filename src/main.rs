@@ -111,7 +111,7 @@ fn main() -> Result<()> {
 			App::new()
 				.app_data(web::Data::new(ResourceDir(resource.clone())))
 				// 1GiB file upload limit
-				.app_data(PayloadConfig::new(1 * 1024 * 1024 * 1024))
+				.app_data(PayloadConfig::new(1024 * 1024 * 1024))
 				.wrap(Logger::new(r#"%a "%r" %s %b %T"#))
 				.service(index)
 				.service(StaticFilesBrowser::new(resource.clone()))
