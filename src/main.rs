@@ -8,10 +8,10 @@ use actix_web::{
 };
 use anyhow::{bail, Context, Result};
 use futures::StreamExt;
-use log::{warn, error, info};
+use log::{error, info, warn};
 use std::{fs, path::PathBuf};
-use tokio::io::AsyncWriteExt;
 use systemd_socket_activation::systemd_socket_activation;
+use tokio::io::AsyncWriteExt;
 
 mod frontend;
 mod staticfiles;
@@ -123,9 +123,11 @@ fn main() -> Result<()> {
 				for socket in sockets {
 					http_server = http_server.listen(socket)?;
 				}
-			},
-			Err(systemd_socket_activation::Error::LibLoadingFailedToLoadSystemd) if cfg!(target_os = "linux") => {
-				warn!("libsystemd not found.");
+			}
+			Err(systemd_socket_activation::Error::LibLoadingFailedToLoadSystemd(e))
+				if cfg!(target_os = "linux") =>
+			{
+				warn!("libsystemd not found: {}", e);
 				http_server = http_server.bind(format!("{}:{}", address, port))?;
 			}
 			Err(e) => {
