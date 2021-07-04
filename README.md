@@ -23,19 +23,10 @@ cargo build --release
 ```
 
 - The binary will be placed at `./target/release/share_it`.
-- By default, Share it compiles with systemd socket activation support (Linux only), and it needs 
-    `libsystemd` for that. If you don't want/have it, add `--no-default-features` to the build
-    command.
 
 # libsystemd
 
-## Ubuntu
 
-On Ubuntu, you only need to get the systemd's dev package, like so:
-
-```
-sudo apt install libsystemd-dev
-```
 
 # Systemd service
 

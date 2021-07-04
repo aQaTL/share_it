@@ -8,14 +8,13 @@ use actix_web::{
 };
 use anyhow::{bail, Context, Result};
 use futures::StreamExt;
-use log::info;
+use log::{warn, error, info};
 use std::{fs, path::PathBuf};
 use tokio::io::AsyncWriteExt;
+use systemd_socket_activation::systemd_socket_activation;
 
 mod frontend;
 mod staticfiles;
-#[cfg(all(target_os = "linux", feature = "systemd"))]
-mod systemd;
 
 use crate::{frontend::*, staticfiles::*};
 
@@ -118,23 +117,25 @@ fn main() -> Result<()> {
 				.default_service(web::to(not_found))
 		});
 
-		#[cfg(all(target_os = "linux", feature = "systemd"))]
-		{
-			match systemd::systemd_socket_activation()? {
-				Some(sockets) => {
-					info!("Using systemd provided sockets instead");
-					for socket in sockets {
-						http_server = http_server.listen(socket)?;
-					}
+		match systemd_socket_activation() {
+			Ok(sockets) if !sockets.is_empty() => {
+				info!("Using systemd provided sockets instead");
+				for socket in sockets {
+					http_server = http_server.listen(socket)?;
 				}
-				None => {
-					http_server = http_server.bind(format!("{}:{}", address, port))?;
-				}
+			},
+			Err(systemd_socket_activation::Error::LibLoadingFailedToLoadSystemd) if cfg!(target_os = "linux") => {
+				warn!("libsystemd not found.");
+				http_server = http_server.bind(format!("{}:{}", address, port))?;
 			}
-		}
-		#[cfg(not(all(target_os = "linux", feature = "systemd")))]
-		{
-			http_server = http_server.bind(format!("{}:{}", address, port))?;
+			Err(e) => {
+				error!("Systemd socket activation failed: {:?}", e);
+				http_server = http_server.bind(format!("{}:{}", address, port))?;
+			}
+			// Call to systemd was successful, but didn't return any sockets
+			Ok(_) => {
+				http_server = http_server.bind(format!("{}:{}", address, port))?;
+			}
 		}
 
 		http_server.run().await?;
