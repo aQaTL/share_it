@@ -1333,7 +1333,7 @@ dependencies = [
 [[package]]
 name = "systemd-socket-activation"
 version = "0.1.0"
-source = "git+https://github.com/aQaTL/systemd-socket-activation?branch=master#200136ab99de48bb8f63af0ef40defd0c8ff50ff"
+source = "git+https://github.com/aQaTL/systemd-socket-activation?branch=master#9a79a915cd4143a9f143fc2364a274b07b992193"
 dependencies = [
  "libloading",
 ]
