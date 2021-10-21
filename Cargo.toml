@@ -2,7 +2,7 @@
 name = "share_it"
 version = "0.1.0"
 authors = ["aQaTL <mmsoltys@outlook.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 
 [dependencies]
