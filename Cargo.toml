@@ -21,6 +21,8 @@ serde = { version = "1.0", features = ["derive", "std"] }
 serde_json = "1.0"
 lazy_static = "1"
 walkdir = "2.2"
+
+[target.'cfg(unix)'.dependencies]
 systemd-socket-activation = { git = "https://github.com/aQaTL/systemd-socket-activation", branch = "master" }
 
 [build-dependencies]

@@ -10,7 +10,6 @@ use anyhow::{bail, Context, Result};
 use futures::StreamExt;
 use log::{error, info, warn};
 use std::{fs, path::PathBuf};
-use systemd_socket_activation::systemd_socket_activation;
 use tokio::io::AsyncWriteExt;
 
 mod frontend;
@@ -81,9 +80,8 @@ fn main() -> Result<()> {
 		resource.pop();
 	}
 
-	let resource_dir: Vec<_> = fs::read_dir(resource.clone())
-		.with_context(|| format!("error reading {:?}", resource,))?
-		.collect();
+	let resource_dir =
+		fs::read_dir(resource.clone()).with_context(|| format!("error reading {:?}", resource,))?;
 
 	info!(
 		"Sharing {} on {}:{}/{}/",
@@ -94,12 +92,10 @@ fn main() -> Result<()> {
 	);
 
 	let resource_dir = resource_dir
-		.into_iter()
 		.filter_map(|e| e.ok())
-		.map(|e| e.file_name().into_string().unwrap())
-		.collect::<Vec<_>>();
+		.map(|e| e.file_name().into_string().unwrap());
 
-	for e in &resource_dir {
+	for e in resource_dir {
 		info!("{}", e);
 	}
 
@@ -117,27 +113,34 @@ fn main() -> Result<()> {
 				.default_service(web::to(not_found))
 		});
 
-		match systemd_socket_activation() {
-			Ok(sockets) if !sockets.is_empty() => {
-				info!("Using systemd provided sockets instead");
-				for socket in sockets {
-					http_server = http_server.listen(socket)?;
+		#[cfg(unix)]
+		{
+			match systemd_socket_activation::systemd_socket_activation() {
+				Ok(sockets) if !sockets.is_empty() => {
+					info!("Using systemd provided sockets instead");
+					for socket in sockets {
+						http_server = http_server.listen(socket)?;
+					}
+				}
+				Err(systemd_socket_activation::Error::LibLoadingFailedToLoadSystemd(e))
+					if cfg!(target_os = "linux") =>
+				{
+					warn!("libsystemd not found: {}", e);
+					http_server = http_server.bind(format!("{}:{}", address, port))?;
+				}
+				Err(e) => {
+					error!("Systemd socket activation failed: {:?}", e);
+					http_server = http_server.bind(format!("{}:{}", address, port))?;
+				}
+				// Call to systemd was successful, but didn't return any sockets
+				Ok(_) => {
+					http_server = http_server.bind(format!("{}:{}", address, port))?;
 				}
 			}
-			Err(systemd_socket_activation::Error::LibLoadingFailedToLoadSystemd(e))
-				if cfg!(target_os = "linux") =>
-			{
-				warn!("libsystemd not found: {}", e);
-				http_server = http_server.bind(format!("{}:{}", address, port))?;
-			}
-			Err(e) => {
-				error!("Systemd socket activation failed: {:?}", e);
-				http_server = http_server.bind(format!("{}:{}", address, port))?;
-			}
-			// Call to systemd was successful, but didn't return any sockets
-			Ok(_) => {
-				http_server = http_server.bind(format!("{}:{}", address, port))?;
-			}
+		}
+		#[cfg(not(unix))]
+		{
+			http_server = http_server.bind(format!("{}:{}", address, port))?;
 		}
 
 		http_server.run().await?;
