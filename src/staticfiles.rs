@@ -1,6 +1,6 @@
 use actix_service::{Service, ServiceFactory};
 use actix_web::dev::{
-	AnyBody, AppService, HttpServiceFactory, ResourceDef, ServiceRequest, ServiceResponse,
+	AppService, HttpServiceFactory, ResourceDef, ServiceRequest, ServiceResponse,
 };
 use actix_web::http::{header, Method, StatusCode};
 use actix_web::{HttpResponse, Responder, ResponseError};
@@ -56,7 +56,7 @@ impl ResponseError for StaticFilesBrowserError {
 		}
 	}
 
-	fn error_response(&self) -> HttpResponse<AnyBody> {
+	fn error_response(&self) -> HttpResponse {
 		use StaticFilesBrowserError::*;
 		match self {
 			NotFound => crate::not_found(),
