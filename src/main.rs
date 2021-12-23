@@ -43,7 +43,7 @@ fn clap_app() -> clap::App<'static, 'static> {
 				.help("ip of the network interface on which the application will serve")
 				.long("address")
 				.takes_value(true)
-				.default_value("127.0.0.1"),
+				.default_value("0.0.0.0"),
 		)
 		.arg(
 			Arg::with_name("port")
