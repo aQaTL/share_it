@@ -9,6 +9,7 @@ use actix_web::{
 use anyhow::{bail, Context, Result};
 use futures::StreamExt;
 use log::{error, info, warn};
+use std::future::ready;
 use std::{fs, path::PathBuf};
 use tokio::io::AsyncWriteExt;
 
@@ -110,7 +111,7 @@ fn main() -> Result<()> {
 				.service(StaticFilesBrowser::new(resource.clone()))
 				.service(upload)
 				.service(serve_frontend)
-				.default_service(web::to(not_found))
+				.default_service(web::to(|| ready(not_found())))
 		});
 
 		#[cfg(unix)]

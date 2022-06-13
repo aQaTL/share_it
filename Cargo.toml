@@ -6,9 +6,9 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-actix-web = "4.0.0-beta.15"
-actix-files = "0.6.0-beta.6"
-actix-service = "2.0.0"
+actix-web = "4.1.0"
+actix-files = "0.6.1"
+actix-service = "2.0.2"
 mime_guess = "2.0.3"
 percent-encoding = "2.1.0"
 flexi_logger = "0.18.0"
@@ -23,7 +23,7 @@ lazy_static = "1"
 walkdir = "2.2"
 
 [target.'cfg(unix)'.dependencies]
-systemd-socket-activation = { git = "https://github.com/aQaTL/systemd-socket-activation", branch = "master" }
+systemd-socket-activation = { git = "https://github.com/aQaTL/systemd-socket-activation", rev = "a80c15060a07830483f1290f7ef4b8543f97d43b" }
 
 [build-dependencies]
 walkdir = "2.2"

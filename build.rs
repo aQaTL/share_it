@@ -8,12 +8,12 @@ fn main() -> Result<(), std::io::Error> {
 		.into_iter()
 		.filter_map(|e| e.ok())
 		.filter(|e| e.path().is_file())
-		.map(|e| e.path().to_str().unwrap().replace("\\", "/"))
+		.map(|e| e.path().to_str().unwrap().replace('\\', "/"))
 		.map(|filename| {
 			format!(
 				"(\"{}\", &include_bytes!(\"{}/{}\")[..]), ",
 				filename.trim_start_matches("frontend/").to_owned(),
-				env!("CARGO_MANIFEST_DIR").replace("\\", "/"),
+				env!("CARGO_MANIFEST_DIR").replace('\\', "/"),
 				filename
 			)
 		})
