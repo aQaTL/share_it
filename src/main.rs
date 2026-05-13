@@ -8,7 +8,7 @@ use actix_web::{
 };
 use anyhow::{bail, Context, Result};
 use futures::StreamExt;
-use log::{error, info, warn};
+use log::info;
 use std::future::ready;
 use std::{fs, path::PathBuf};
 use tokio::io::AsyncWriteExt;
@@ -86,7 +86,7 @@ fn main() -> Result<()> {
 
 	info!(
 		"Sharing {} on {}:{}/{}/",
-		resource.file_name().unwrap().to_string_lossy(),
+		resource.file_name().unwrap_or_else(|| resource.as_os_str()).to_string_lossy(),
 		address,
 		port,
 		name
