@@ -8,7 +8,7 @@ use actix_web::{
 };
 use anyhow::{bail, Context, Result};
 use futures::StreamExt;
-use log::info;
+use log::*;
 use std::future::ready;
 use std::{fs, path::PathBuf};
 use tokio::io::AsyncWriteExt;
