@@ -156,7 +156,7 @@ struct ResourceDir(PathBuf);
 
 #[get("/")]
 async fn index() -> HttpResponse {
-	let index_html: &'static [u8] = *FRONTEND_FILES.get("index.html").unwrap();
+	let index_html: &'static [u8] = FRONTEND_FILES.get("index.html").unwrap();
 	HttpResponse::Ok()
 		.insert_header(header::ContentType::html())
 		.body(index_html)
@@ -183,7 +183,7 @@ pub fn not_found() -> HttpResponse {
 async fn serve_frontend(resource: web::Path<PathBuf>) -> Option<HttpResponse> {
 	let resource = resource.into_inner();
 	info!("Serving frontend file {:?}", resource);
-	let file: &'static [u8] = *FRONTEND_FILES.get(resource.to_str().unwrap())?;
+	let file: &'static [u8] = FRONTEND_FILES.get(resource.to_str().unwrap())?;
 	let mut response = HttpResponse::Ok();
 
 	let mime_guess = mime_guess::from_path(resource.as_path());
